@@ -1,0 +1,13 @@
+<html>
+<head>
+	<meta charset="UTF-8">
+</head>
+<body>
+<p>Add a new task to the Todo List:</p>
+<form action="/new" method="GET">
+	<div>{{ form.task.label }}</div>
+	<div>{{ form.task }}</div>
+  <input type="submit" name="save" value="save">
+</form>
+</body>
+</html>

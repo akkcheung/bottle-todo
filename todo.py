@@ -1,10 +1,21 @@
 import sqlite3
-from bottle import route, run, debug, template, request, static_file, error
+#from bottle import route, run, debug, template, request, static_file, error
+from bottle import Bottle, run, debug, template, request, static_file, error
+
+from bottle import jinja2_template
+
+from jinja2 import Template
+from wtforms import Form, BooleanField, StringField, validators
 
 # only needed when you run Bottle on mod_wsgi
 #from bottle import default_app
 
-@route('/todo')
+class MyForm(Form):
+    task = StringField('Task', validators=[validators.input_required()])
+
+app = Bottle()
+
+@app.route('/todo')
 def todo_list():
 
     conn = sqlite3.connect('todo.db')
@@ -13,31 +24,40 @@ def todo_list():
     result = c.fetchall()
     c.close()
 
-    output = template('make_table', rows=result)
+    #debug
+    for row in result:
+        print('row is', row[0])
+        
+    #output = template('make_table', rows=result)
+    output = jinja2_template('make_table.html', rows=result)
+
     return output
 
-@route('/new', method='GET')
+@app.route('/new', method='GET')
 def new_item():
+
+    form = MyForm(request.GET)
 
     if request.GET.save:
 
-        new = request.GET.task.strip()
-        conn = sqlite3.connect('todo.db')
+        if form.validate():
+            new = request.GET.task.strip() #already utf8 encode
+            conn = sqlite3.connect('todo.db')
 
-        c = conn.cursor()
-        c.execute("insert into todo (task, status) values (?, ?)", (new, 1))
-        new_id = c.lastrowid
+            c = conn.cursor()
+            c.execute("insert into todo (task, status) values (?, ?)", (new, 1))
+            new_id = c.lastrowid
 
-        conn.commit()
-        c.close()
+            conn.commit()
+            c.close()
 
-        return '<p>The new task was inserted into the database, the ID is %s</p>'
+            return '<p>The new task was inserted into the database, the ID is %s</p>'
     
     else:
-        return template('new_task.tpl')
+        #return template('new_task.tpl')
+        return jinja2_template('new_task.html', form=form)
 
-#@route('/item<item:re:[0-9]+>')
-@route('/item/<item:re:[0-9]+>')
+@app.route('/item/<item:re:[0-9]+>')
 def show_item(item):
 	
     conn = sqlite3.connect('todo.db')
@@ -51,7 +71,7 @@ def show_item(item):
     else:
         return 'Task: %s' % result[0]
 
-@route('/edit/<no:int>', mehtod='GET')
+@app.route('/edit/<no:int>', mehtod='GET')
 def edit_item(no):
 
     if request.GET.save:
@@ -78,17 +98,19 @@ def edit_item(no):
 
        return template('edit_task', old=cur_data, no=no)
 
-@route('/help')
+@app.route('/help')
 def help():
     return static_file('help.html', root='.')
 
-@error(403)
+@app.error(403)
 def mistake403(code):
 	return 'There is a mistake in your url!'
 
-@error(404)
+@app.error(404)
 def mistake404(code):
 	return 'Sorry, this page does not exist!'
 
+#app.install(plugins.WTForms())
+
 debug(True)
-run(reloader=True, port=5000)
+run(app, reloader=True, port=5000)
